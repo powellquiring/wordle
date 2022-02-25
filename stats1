@@ -1,0 +1,30 @@
+Sun Feb 13 08:13:09 2022    w.profile.1
+
+         236798650 function calls (236780045 primitive calls) in 125.607 seconds
+
+   Ordered by: cumulative time
+   List reduced from 1292 to 20 due to restriction <20>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    146/1    0.000    0.000  125.607  125.607 {built-in method builtins.exec}
+        1    0.157    0.157  125.607  125.607 w.py:2(<module>)
+        1    0.000    0.000  125.180  125.180 w.py:195(report)
+        1    0.055    0.055  125.172  125.172 w.py:181(__init__)
+     5757    0.013    0.000  125.117    0.022 w.py:133(enter_guess)
+     5757   38.660    0.007  122.546    0.021 w.py:100(wordle)
+ 33148806   52.556    0.000   54.730    0.000 w.py:28(__init__)
+ 13114291    7.880    0.000   14.036    0.000 w.py:161(intersect)
+ 22660331    8.226    0.000   10.133    0.000 w.py:146(subset_bool)
+ 54120702    8.069    0.000    8.069    0.000 {method 'find' of 'str' objects}
+99511959/99507250    6.678    0.000    6.680    0.000 {built-in method builtins.len}
+     5758    1.369    0.000    2.527    0.000 w.py:43(__init__)
+  9255217    1.088    0.000    1.088    0.000 {method 'add' of 'set' objects}
+  4614371    0.562    0.000    0.562    0.000 {method 'lower' of 'str' objects}
+    193/2    0.001    0.000    0.248    0.124 <frozen importlib._bootstrap>:1002(_find_and_load)
+    192/2    0.001    0.000    0.248    0.124 <frozen importlib._bootstrap>:967(_find_and_load_unlocked)
+    173/2    0.001    0.000    0.248    0.124 <frozen importlib._bootstrap>:659(_load_unlocked)
+    144/2    0.000    0.000    0.247    0.124 <frozen importlib._bootstrap_external>:844(exec_module)
+    223/2    0.000    0.000    0.247    0.124 <frozen importlib._bootstrap>:220(_call_with_frames_removed)
+    38/17    0.000    0.000    0.168    0.010 {built-in method builtins.__import__}
+
+

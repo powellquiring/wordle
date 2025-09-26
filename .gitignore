@@ -1,0 +1,15 @@
+# executables
+*.test
+*.prof
+main
+
+# Vim temporary files
+*.swp
+*.swo
+*~
+.*.swp
+.*.swo
+*.tmp
+*.bak
+.vimrc.local
+.vimrc.bundles.local

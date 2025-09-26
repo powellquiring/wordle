@@ -1,0 +1,9 @@
+# Ignore everything
+*
+
+# But allow .go files
+!*.go
+!.gitignore
+
+# Allow directories (so git can traverse them)
+!*/

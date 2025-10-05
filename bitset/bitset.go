@@ -101,6 +101,12 @@ func (b *BitSet) Intersection(compare *BitSet) *BitSet {
 	return &result
 }
 
+func (b *BitSet) IntersectionInPlace(compare *BitSet, result *BitSet) {
+	for i, word := range b {
+		result[i] = word & compare[i]
+	}
+}
+
 // Count (number of set bits).
 // Also known as "popcount" or "population count".
 func (b *BitSet) Count() uint {

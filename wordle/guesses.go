@@ -98,7 +98,7 @@ func (d *Dictionary) GetFullAnswerForDictionaryWithCache(wordlist *WordList, sol
 	}
 }
 
-func (d *Dictionary) GetFullAnswer(wordlist *WordList, solution WordleWord, guess WordleWord) FullAnswer {
+func (d *Dictionary) GetFullAnswer(wordlist *WordList, solution WordleWord, guess WordleWord, possibleWords *WordList) FullAnswer {
 	var fullAnswer FullAnswer
 	if cacheSolutionGuess {
 		fullAnswer = d.GetFullAnswerForDictionaryWithCache(wordlist, solution, guess)
@@ -106,7 +106,7 @@ func (d *Dictionary) GetFullAnswer(wordlist *WordList, solution WordleWord, gues
 		fullAnswer = d.GetFullAnswerForDictionary(wordlist, solution, guess)
 	}
 	bs := (*bitset.BitSet)(fullAnswer.AnswerMatching)
-	possibleWords := bs.Intersection((*bitset.BitSet)(wordlist))
+	bs.IntersectionInPlace((*bitset.BitSet)(wordlist), (*bitset.BitSet)(possibleWords))
 	return FullAnswer{AnswerColor: fullAnswer.AnswerColor, AnswerMatching: (*WordList)(possibleWords)}
 }
 
@@ -132,12 +132,14 @@ func subscoreCacheSet(matching *WordList, subscore int) {
 }
 
 func (d *Dictionary) SortedGuesses(possibleWords *WordList) *MinHeap[Item] {
+	// possible words are allocated here to minimize the number of initializations
+	var fullanswerPossibleWords WordList
 	ret := NewMinHeapWordleWordPriority()
 	for _, guess := range d.WordlistAll().Range {
 		score := 0
 		guessInPossibleWords := false
 		for _, solution := range possibleWords.Range {
-			fullAnswer := d.GetFullAnswer(possibleWords, solution, guess)
+			fullAnswer := d.GetFullAnswer(possibleWords, solution, guess, &fullanswerPossibleWords)
 			matching := fullAnswer.AnswerMatching
 			matchingLen := matching.Len()
 			score += matchingLen
@@ -159,6 +161,10 @@ var depthExceededCount int
 // based on "guess score" for that word.
 func (d *Dictionary) NextGuessSearch(possibleWords *WordList, depth int) (int, *WordList) {
 	const INIFINITY_SCORE = 1000000
+
+	// possible words are allocated here to minimize the number of initializations
+	var fullanswerPossibleWords WordList
+
 	if depth > 14 {
 		depthExceededCount++
 		fmt.Println("depth:", depth, "possibleWords:", depthExceededCount, possibleWords.Len(), d.WordlistStrings(possibleWords))
@@ -237,7 +243,7 @@ func (d *Dictionary) NextGuessSearch(possibleWords *WordList, depth int) (int, *
 			break
 		}
 		for count, solution := range possibleWords.Range {
-			fullAnswer := d.GetFullAnswer(possibleWords, solution, guess)
+			fullAnswer := d.GetFullAnswer(possibleWords, solution, guess, &fullanswerPossibleWords)
 			matching := fullAnswer.AnswerMatching
 			matchingLen := matching.Len()
 			//	if len(matching) == possibleWordsLen {
@@ -311,6 +317,8 @@ func (d *Dictionary) NextGuessSearch(possibleWords *WordList, depth int) (int, *
 
 // simulate one game given the first word and the solution
 func SimulateOneGameGivenFirstWord(dictionary *Dictionary, solution WordleWord, initialGuesses []WordleWord) []WordleWord {
+	// possible words are allocated here to minimize the number of initializations
+	var fullanswerPossibleWords WordList
 	guesses := []WordleWord{}
 	matchingWords := dictionary.WordlistAll()
 	for guessCount := range 8 {
@@ -321,7 +329,7 @@ func SimulateOneGameGivenFirstWord(dictionary *Dictionary, solution WordleWord, 
 			nextGuess = dictionary.NextGuess(matchingWords)
 		}
 		guesses = append(guesses, nextGuess)
-		fullAnswer := dictionary.GetFullAnswer(matchingWords, solution, nextGuess)
+		fullAnswer := dictionary.GetFullAnswer(matchingWords, solution, nextGuess, &fullanswerPossibleWords)
 		matchingWords = fullAnswer.AnswerMatching
 		if matchingWords.Len() == 1 {
 			words := matchingWords.Words()

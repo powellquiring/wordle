@@ -3,6 +3,7 @@ package wordle
 import (
 	"container/heap"
 	"fmt"
+	"sort"
 
 	//	"github.com/bits-and-blooms/bitset"
 	"github.com/powellquiring/wordle/bitset"
@@ -49,6 +50,30 @@ func NewMinHeapWordleWordPriority() *MinHeap[Item] {
 	}
 	heap.Init(ret)
 	return ret
+}
+
+type WordScore struct {
+	Value WordleWord
+	Score uint16 // The priority of the item lower is better.
+}
+
+type WordScoreSorter []WordScore
+
+/*
+	func NewWordScoreHeap(len int) *WordScoreSorter {
+		wordScores := make([]WordScore, 0, len)
+		return (*WordScoreSorter)(&wordScores)
+	}
+*/
+func (h *WordScoreSorter) Reset() {
+	*h = (*h)[:0]
+}
+
+func (h *WordScoreSorter) Push(x WordScore) {
+	if len(*h) >= cap(*h) {
+		panic("WordScoreHeap is full")
+	}
+	*h = append(*h, x)
 }
 
 var fullAnswerCacheHitCount int
@@ -131,10 +156,16 @@ func subscoreCacheSet(matching *WordList, subscore int) {
 	subscoreCache[*matching] = subscore
 }
 
-func (d *Dictionary) SortedGuesses(possibleWords *WordList) *MinHeap[Item] {
+var wordScoreSorter WordScoreSorter
+
+func (d *Dictionary) SortedGuesses(possibleWords *WordList, depth int) *WordScoreSorter {
 	// possible words are allocated here to minimize the number of initializations
 	var fullanswerPossibleWords WordList
-	ret := NewMinHeapWordleWordPriority()
+	wordScoreSorter := &wordScoreSorter
+	if len(*wordScoreSorter) == 0 {
+		*wordScoreSorter = make([]WordScore, d.Len())
+	}
+	wordScoreSorter.Reset()
 	for _, guess := range d.WordlistAll().Range {
 		score := 0
 		guessInPossibleWords := false
@@ -150,16 +181,19 @@ func (d *Dictionary) SortedGuesses(possibleWords *WordList) *MinHeap[Item] {
 		if guessInPossibleWords == true {
 			score -= 2
 		}
-		heap.Push(ret, Item{Value: guess, Score: score})
+		wordScoreSorter.Push(WordScore{Value: guess, Score: uint16(score)})
 	}
-	return ret
+	sort.Slice(*wordScoreSorter, func(i, j int) bool {
+		return (*wordScoreSorter)[i].Score < (*wordScoreSorter)[j].Score
+	})
+	return wordScoreSorter
 }
 
 var depthExceededCount int
 
 // starting with a subset of the dictionary words (wordlist) give a score to each word in the dictionary
 // based on "guess score" for that word.
-func (d *Dictionary) NextGuessSearch(possibleWords *WordList, depth int) (int, *WordList) {
+func (d *Dictionary) NextGuessSearch(possibleWords *WordList, depth int) (int, WordleWord) {
 	const INIFINITY_SCORE = 1000000
 
 	// possible words are allocated here to minimize the number of initializations
@@ -174,11 +208,11 @@ func (d *Dictionary) NextGuessSearch(possibleWords *WordList, depth int) (int, *
 		panic("possibleWords is empty")
 	}
 	if possibleWordsLen == 1 {
-		return 100, possibleWords // just guess it
+		return 100, possibleWords.FirstWord() // just guess it
 	}
 	if possibleWordsLen == 2 {
 		// if there are two words choose either of the words and the guesses will be 1 if the right guess and 2 if the wrong guess
-		return 150, possibleWords
+		return 150, possibleWords.FirstWord()
 	}
 
 	// Using the possible words the best guess is the matching one for one solution and 2 for the rest of the solutions.
@@ -211,9 +245,13 @@ func (d *Dictionary) NextGuessSearch(possibleWords *WordList, depth int) (int, *
 	} else {
 		flagGuessCountCutOff = 140
 		maxGuessCount := 200
-		sortedScores := d.SortedGuesses(possibleWords)
-		for guessCount := 0; (sortedScores.Len() > 0) && (guessCount < maxGuessCount); guessCount++ {
-			item := heap.Pop(sortedScores).(Item)
+		if maxGuessCount > d.Len() {
+			maxGuessCount = d.Len()
+		}
+		wordScoreSorter := d.SortedGuesses(possibleWords, depth)
+		// sortedScores := d.SortedGuesses(possibleWords, wordScoreSorter)
+		for guessCount := 0; (len(*wordScoreSorter) > 0) && (guessCount < maxGuessCount); guessCount++ {
+			item := (*wordScoreSorter)[guessCount]
 			guess := item.Value
 			if _, ok := possibleWordsSet[guess]; ok {
 				guessesInPossibleWords = append(guessesInPossibleWords, guess)
@@ -225,7 +263,7 @@ func (d *Dictionary) NextGuessSearch(possibleWords *WordList, depth int) (int, *
 
 	bestScore := INIFINITY_SCORE
 	// assume best possible score is a correct guess (100) and getting all the rest of the solutions in 2 guesses
-	var bestGuess *WordList
+	var bestGuess WordleWord
 	// TODO
 	for guessCount, guess := range append(guessesInPossibleWords, guessesNotInPossibleWords...) {
 		//guessesLen := len(guessesInPossibleWords)
@@ -302,11 +340,10 @@ func (d *Dictionary) NextGuessSearch(possibleWords *WordList, depth int) (int, *
 				fmt.Println("old/new:", bestScore, score, "depth:", depth, "guessCount:", guessCount, "guess:", d.String(guess), "possibleWords:", possibleWordsLen, d.WordlistStrings(possibleWords))
 			}
 			bestScore = score
-			bestGuess = d.WordlistEmpty()
-			bestGuess.Insert(guess)
+			bestGuess = guess
 
-		} else if score == bestScore {
-			bestGuess.Insert(guess)
+			//} else if score == bestScore {
+			//	bestGuess.Insert(guess)
 		}
 		if false && (depth == 0) {
 			fmt.Println("depth guessCount score", depth, guessCount, score)

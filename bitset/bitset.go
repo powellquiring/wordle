@@ -73,6 +73,9 @@ func (b *BitSet) isLenExactMultiple(length uint) bool {
 
 func popcntSlice(s BitSet) (cnt uint64) {
 	for _, x := range s {
+		if x == 0 {
+			continue
+		}
 		cnt += uint64(OnesCount64(x))
 	}
 	return

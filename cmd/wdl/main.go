@@ -1,12 +1,13 @@
 package main
 
 import (
-	"container/heap"
 	"context"
 	"fmt"
 	"log"
+	"maps"
 	"os"
 	"runtime/pprof"
+	"slices"
 	"sort"
 
 	"github.com/powellquiring/wordle/wordle"
@@ -36,7 +37,91 @@ func playWordle(globalConfig GlobalConfiguration, answers []string) {
 	fmt.Println()
 }
 
-func simulate(globalConfig GlobalConfiguration, oneGame bool, firstWordsStrings []string, solutionStrings []string) {
+type GuessResults struct {
+	Guess      string
+	Average    float64
+	GuessCount []int // number of games for each guess count
+}
+
+type Game struct {
+	Solution wordle.WordleWord
+	Guesses  []wordle.WordleWord
+}
+
+const FIRST_DIR = "saved"
+
+func replaceFirstFiles(d *wordle.Dictionary, summary []map[int][]Game) {
+	for _, sortedGames := range summary {
+		firstWord := d.String(sortedGames[1][0].Guesses[0])
+		filename := FIRST_DIR + "/" + firstWord + ".json"
+		fmt.Println("writing", filename)
+
+	}
+
+}
+func outputFinalSummary(d *wordle.Dictionary, summary []map[int][]Game) {
+	const MAX_GUESS_COUNT = 7
+	games := make([]GuessResults, 0)
+	for _, sortedGames := range summary {
+		totalGuesses := 0
+		totalGames := 0
+		guessCount := make([]int, MAX_GUESS_COUNT)
+		guess := ""
+		for i := range MAX_GUESS_COUNT - 1 { // 1, 7
+			numberGuessesAtCount := i + 1 // 1, 7
+			gameGuesses, ok := sortedGames[numberGuessesAtCount]
+			if ok {
+				guess = d.String(gameGuesses[0].Guesses[0])
+			} else {
+				gameGuesses = make([]Game, 0)
+			}
+			totalGuesses += numberGuessesAtCount * len(gameGuesses)
+			totalGames += len(gameGuesses)
+			guessCount[numberGuessesAtCount] = len(gameGuesses)
+		}
+		games = append(games, GuessResults{guess, float64(totalGuesses) / float64(totalGames), guessCount})
+	}
+
+	fmt.Println("By average")
+	sort.Slice(games, func(i, j int) bool {
+		return games[i].Average < games[j].Average
+	})
+	printGames(games)
+
+	fmt.Println("By guess 6")
+	sort.Slice(games, func(i, j int) bool {
+		return games[i].GuessCount[6] < games[j].GuessCount[6]
+	})
+	printGames(games)
+
+	fmt.Println("By guess 5+6")
+	sort.Slice(games, func(i, j int) bool {
+		return games[i].GuessCount[6]+games[i].GuessCount[5] < games[j].GuessCount[6]+games[j].GuessCount[5]
+	})
+	printGames(games)
+
+	fmt.Println("By guess 2+3")
+	sort.Slice(games, func(i, j int) bool {
+		return games[i].GuessCount[2]+games[i].GuessCount[3] > games[j].GuessCount[2]+games[j].GuessCount[3]
+	})
+	printGames(games)
+	fmt.Println("done")
+}
+
+func printGames(gameResults []GuessResults) {
+	for _, gameResult := range gameResults {
+		fmt.Printf("%s %f ", gameResult.Guess, gameResult.Average)
+		for guessCount, numberGuessesAtCount := range gameResult.GuessCount {
+			if guessCount < 1 {
+				continue
+			}
+			fmt.Printf("%d ", numberGuessesAtCount)
+		}
+		fmt.Println()
+	}
+}
+
+func simulate(globalConfig GlobalConfiguration, oneGame bool, replaceFirst bool, firstWordsStrings []string, solutionStrings []string) {
 	d := globalConfig.dictionary
 	solutions := d.WordlistEmpty()
 	if len(solutionStrings) == 0 {
@@ -51,10 +136,6 @@ func simulate(globalConfig GlobalConfiguration, oneGame bool, firstWordsStrings 
 		}
 	}
 
-	type Game struct {
-		Solution wordle.WordleWord
-		Guesses  []wordle.WordleWord
-	}
 	/*
 		var bar *progressbar.ProgressBar
 		if globalConfig.progress {
@@ -65,8 +146,8 @@ func simulate(globalConfig GlobalConfiguration, oneGame bool, firstWordsStrings 
 	*/
 
 	// firstWords is a slice (outer loop) of slices (guesses for one game), see SimulateOneGameGivenFirstWord)
-	// if oneGame is true then there is only one outer loop
-
+	// if oneGame is true then there is only one outer loop and one or more guesses for the game.  If oneGame is false
+	// then there are multiple outer loops (games) and only one guess for each game.
 	var initialGuesesList [][]wordle.WordleWord
 	if len(firstWordsStrings) == 0 {
 		if oneGame {
@@ -90,6 +171,7 @@ func simulate(globalConfig GlobalConfiguration, oneGame bool, firstWordsStrings 
 		}
 	}
 
+	summary := make([]map[int][]Game, len(initialGuesesList))
 	for outerLoopCount, initialGuesses := range initialGuesesList {
 		sortedGames := make(map[int][]Game)
 		fmt.Println("outer loop count, limit:", outerLoopCount, len(initialGuesesList), d.WordSliceToStrings(initialGuesses))
@@ -101,18 +183,13 @@ func simulate(globalConfig GlobalConfiguration, oneGame bool, firstWordsStrings 
 			}
 			fmt.Println()
 
-			if _, ok := sortedGames[len(guesses)]; !ok {
-				sortedGames[len(guesses)] = make([]Game, 0)
-			}
 			sortedGames[len(guesses)] = append(sortedGames[len(guesses)], Game{solution, guesses})
 		}
-		fmt.Println("---------------------")
+		fmt.Println(d.String(initialGuesses[0]), "---------------------")
 
 		// create slice of number of guesses
-		keys := make([]int, 0, len(sortedGames))
-		for k := range sortedGames {
-			keys = append(keys, k)
-		}
+		keys := slices.Collect(maps.Keys(sortedGames))
+
 		// Sort the slice of keys
 		sort.Ints(keys)
 
@@ -127,17 +204,21 @@ func simulate(globalConfig GlobalConfiguration, oneGame bool, firstWordsStrings 
 				fmt.Println()
 			}
 		}
+		summary[outerLoopCount] = sortedGames
+	}
+	outputFinalSummary(d, summary)
+	if replaceFirst {
+		replaceFirstFiles(d, summary)
 	}
 }
 
 func first(globalConfig GlobalConfiguration) {
 	d := globalConfig.dictionary
-	sortedGuessScores := d.SortedGuesses(d.WordlistAll())
-	for sortedGuessScores.Len() > 0 {
-		item := heap.Pop(sortedGuessScores).(wordle.Item)
+	wordScoreSorter := d.SortedGuesses(d.WordlistAll(), 0)
+	// for sortedGuessScores.Len() > 0 {
+	for _, item := range *wordScoreSorter {
 		fmt.Println(d.String(item.Value), item.Score)
 	}
-
 }
 
 func cpuProfile() func() {
@@ -172,6 +253,7 @@ func main() {
 	firstWord := ""
 	// command specific flags
 	simulateOneGame := false
+	simulateReplace := false
 	cmd := &cli.Command{
 		Name:  "wdl",
 		Usage: "wordle",
@@ -248,6 +330,15 @@ func main() {
 						Useful for finding performance problems for combinartions of guesses.`,
 						Destination: &simulateOneGame,
 					},
+					&cli.BoolFlag{
+						Name:  "replace",
+						Value: false,
+						Usage: `wdl sim -replace [--first abyss]
+						incompatible with the -one flag. Simulate game(s) of wordle and replace the contents in the saved/ directory.
+						has a file for each first word, first.json, containg the optimial play for the word.  First.json files will be used
+						to improve performance of the play command.`,
+						Destination: &simulateReplace,
+					},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					firstWords := cmd.StringSlice("first")
@@ -256,7 +347,7 @@ func main() {
 						def := cpuProfile()
 						defer def()
 					}
-					simulate(globalCofiguration(count, progress), simulateOneGame, firstWords, solutions)
+					simulate(globalCofiguration(count, progress), simulateOneGame, simulateReplace, firstWords, solutions)
 					return nil
 				},
 			},

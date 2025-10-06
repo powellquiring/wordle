@@ -158,8 +158,8 @@ func (d *Dictionary) WordSliceToStrings(wordSlice []WordleWord) []string {
 
 // given a wordlist a solution and a guess return the answer and new wordlist
 func (d *Dictionary) NextGuess(wordlist *WordList) WordleWord {
-	_, guesses := d.NextGuessSearch(wordlist, 0)
-	return guesses.Words()[0]
+	_, guess := d.NextGuessSearch(wordlist, 0)
+	return guess
 }
 
 func (wl *WordList) Range(yield func(i int, wordleWord WordleWord) bool) {
@@ -192,7 +192,8 @@ func (wl *WordList) FirstWord() WordleWord {
 
 func (wl *WordList) Len() int {
 	bs := (*bitset.BitSet)(wl)
-	return int(bs.Count())
+	length := int(bs.Count())
+	return length
 }
 
 func (wordlist *WordList) Insert(word WordleWord) {

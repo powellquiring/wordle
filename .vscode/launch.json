@@ -10,7 +10,7 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}/cmd/wdl/main.go",
-             "args": ["sim", "-c", "100"]
+             "args": ["sim", "-c", "50", "-replace"]
         },
 
     ]

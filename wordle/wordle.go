@@ -104,6 +104,12 @@ func (d *Dictionary) WordlistAll() *WordList {
 	return (*WordList)(ret)
 }
 
+func (d *Dictionary) WordlistAllMinusThese(subtractThese *WordList) *WordList {
+	all := d.WordlistAll()
+	ret := (*WordList)((*bitset.BitSet)(all).Difference((*bitset.BitSet)(subtractThese)))
+	return ret
+}
+
 func (d *Dictionary) WordlistFromStrings(strings []string) *WordList {
 	ret := d.WordlistEmpty()
 	for _, word := range strings {

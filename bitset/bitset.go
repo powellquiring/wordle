@@ -1,6 +1,8 @@
 package bitset
 
-import "math/bits"
+import (
+	"math/bits"
+)
 
 const UINT64S = 37
 const BYTES = UINT64S * 8
@@ -71,7 +73,7 @@ func (b *BitSet) isLenExactMultiple(length uint) bool {
 	return wordsIndex(length) == 0
 }
 
-func popcntSlice(s BitSet) (cnt uint64) {
+func popcntSlice(s *BitSet) (cnt uint64) {
 	for _, x := range s {
 		if x == 0 {
 			continue
@@ -110,10 +112,41 @@ func (b *BitSet) IntersectionInPlace(compare *BitSet, result *BitSet) {
 	}
 }
 
+// Intersection of base set and other set.  Assume compare has more zero words than b.
+// looking for the total number of bits set after the and operation.
+func (b *BitSet) IntersectionBitCount(compare *BitSet) int {
+	cnt := 0
+	for i, bWord := range b {
+		if bWord == 0 {
+			continue
+		}
+		cWord := compare[i]
+		if cWord == 0 { // this test might cost more than it's worth
+			continue
+		}
+		result := bWord & cWord
+		if result == 0 {
+			continue
+		}
+		cnt += OnesCount64(result)
+	}
+	return cnt
+}
+
+// Difference of base set and other set
+// This is the BitSet equivalent of &^ (and not)
+func (b *BitSet) Difference(compare *BitSet) *BitSet {
+	result := &BitSet{}
+	for i := range compare {
+		result[i] = b[i] ^ compare[i]
+	}
+	return result
+}
+
 // Count (number of set bits).
 // Also known as "popcount" or "population count".
 func (b *BitSet) Count() uint {
-	return uint(popcntSlice(*b))
+	return uint(popcntSlice(b))
 }
 
 // Clean last word by setting unused bits to 0

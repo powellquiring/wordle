@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"maps"
@@ -51,13 +52,57 @@ type Game struct {
 const FIRST_DIR = "saved"
 
 func replaceFirstFiles(d *wordle.Dictionary, summary []map[int][]Game) {
+	// Create the FIRST_DIR directory if it doesn't exist
+	if err := os.MkdirAll(FIRST_DIR, 0755); err != nil {
+		panic("failed to create directory " + FIRST_DIR + ": " + err.Error())
+	}
+
 	for _, sortedGames := range summary {
-		firstWord := d.String(sortedGames[1][0].Guesses[0])
+		// Get the first word from the first game with 1 guess (if it exists)
+		var firstWord string
+		if games, ok := sortedGames[1]; ok && len(games) > 0 {
+			firstWord = d.String(games[0].Guesses[0])
+		} else {
+			panic("no first word")
+		}
+
 		filename := FIRST_DIR + "/" + firstWord + ".json"
 		fmt.Println("writing", filename)
 
-	}
+		// Create the JSON structure: map[string][][]string
+		jsonData := make(map[string][][]string)
 
+		// Create array of arrays - each inner array contains solutions with same number of guesses
+		var allSequences [][]string
+		for numberOfGuesses, games := range sortedGames {
+			if numberOfGuesses <= 1 {
+				// do not include the first guess that matches the solution
+				continue
+			}
+			for _, game := range games {
+				guesses := make([]string, 0)
+				for guessCount, guess := range game.Guesses {
+					if guessCount == 0 {
+						continue // first guess is the firstWord do not need to repeat it for every set of guesses
+					}
+					guesses = append(guesses, d.String(guess))
+				}
+				allSequences = append(allSequences, guesses)
+			}
+		}
+
+		jsonData[firstWord] = allSequences
+
+		// Write JSON to file
+		jsonBytes, err := json.MarshalIndent(jsonData, "", "  ")
+		if err != nil {
+			panic("failed to marshal JSON for " + firstWord + ": " + err.Error())
+		}
+
+		if err := os.WriteFile(filename, jsonBytes, 0644); err != nil {
+			panic("failed to write file " + filename + ": " + err.Error())
+		}
+	}
 }
 func outputFinalSummary(d *wordle.Dictionary, summary []map[int][]Game) {
 	const MAX_GUESS_COUNT = 7
